@@ -1,0 +1,65 @@
+name: sales_rep_app
+description: PROMAX مناديب — أبلكيشن الكاش فان والكورير (متصل بـ PROMAX ERP)
+publish_to: 'none'
+version: 1.1.5+7
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  firebase_core: ^4.13.0
+  firebase_messaging: ^16.5.0
+  flutter:
+    sdk: flutter
+  http: ^1.2.2
+  image_picker: ^1.1.2      # تصوير المكان والأوراق بالكاميرا
+  # ملاحظة: اختيار ملفات PDF متعمل بكود أصلي في MainActivity (lib/doc_picker.dart)
+  # بدل باكدج file_picker اللي كان بيعمل تعارض في البيلد
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/brand/logo/
+
+  # خطوط الواجهة — Cairo للعربي و Poppins للإنجليزي، وZagma للعناوين
+  #
+  # ⚠️ كل وزن لازم يكون له ملف. فلاتر **مابيعملش bold صناعي** للخط
+  # المخصص: لو الوزن مش مسجّل هنا، `FontWeight.w700` بينزل على أقرب
+  # وزن موجود والشاشة كلها تطلع بنفس السُمك.
+  fonts:
+    - family: Cairo
+      fonts:
+        - asset: assets/brand/fonts/Cairo-Regular.ttf
+          weight: 400
+        - asset: assets/brand/fonts/Cairo-Medium.ttf
+          weight: 500
+        - asset: assets/brand/fonts/Cairo-SemiBold.ttf
+          weight: 600
+        - asset: assets/brand/fonts/Cairo-Bold.ttf
+          weight: 700
+        # الأبلكيشن بيستخدم w800 في 19 مكان — من غير الملف ده كانوا
+        # هينزلوا على 700 أو 900 والفرق بين العناوين بيختفي
+        - asset: assets/brand/fonts/Cairo-ExtraBold.ttf
+          weight: 800
+        - asset: assets/brand/fonts/Cairo-Black.ttf
+          weight: 900
+    - family: Poppins
+      fonts:
+        - asset: assets/brand/fonts/Poppins-Regular.ttf
+          weight: 400
+        - asset: assets/brand/fonts/Poppins-Medium.ttf
+          weight: 500
+        - asset: assets/brand/fonts/Poppins-Bold.ttf
+          weight: 700
+    - family: Zagma
+      fonts:
+        - asset: assets/brand/fonts/Zagma-Regular.otf
+          weight: 400
+        - asset: assets/brand/fonts/Zagma-Black.otf
+          weight: 900

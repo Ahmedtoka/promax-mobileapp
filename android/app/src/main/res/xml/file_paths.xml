@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    مسارات FileProvider.
+
+    ⚠️ **مسطّب الحزم عملية تانية خالص** — مش شايف ملفات الأبلكيشن
+    إلا لو اتشاركت من هنا. `external-files-path` بيقابل
+    `getExternalFilesDir(null)` اللي بننزّل فيه الـAPK في
+    `MainActivity.downloadAndInstall`. أي تغيير في المسار هناك
+    لازم يتغيّر هنا كمان وإلا التسطيب بيفشل بـ
+    IllegalArgumentException.
+-->
+<paths>
+    <external-files-path name="update" path="update/" />
+
+    <!--
+        ⚠️ **الفواتير في الكاش مش في التخزين العام.** المندوب بيشارك
+        الصورة على طول (واتساب غالباً) ومش محتاجها متخزنة بعدين —
+        والكاش مالوش إذن ونظام أندرويد بينضّفه لوحده. الكتابة في
+        Pictures كانت هتحتاج إذن تخزين يترفض ويوقف الفيتشر كلها.
+    -->
+    <cache-path name="invoices" path="invoices/" />
+</paths>

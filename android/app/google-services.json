@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "546124207040",
+    "project_id": "promax-1f1ec",
+    "storage_bucket": "promax-1f1ec.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:546124207040:android:a5eb14561930bc4695ae25",
+        "android_client_info": {
+          "package_name": "com.promax.reps"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCnOFpRln0lE1VDJpQ6CgTuksLVtStjrN0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

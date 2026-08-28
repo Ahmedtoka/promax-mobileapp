@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ألوان الهوية الرسمية — Brand Guidelines 2024 -->
+<resources>
+    <color name="royal_blue">#12399B</color>
+    <color name="purple_heart">#602D90</color>
+    <color name="razzmatazz">#D74297</color>
+    <color name="brand_yellow">#FFF927</color>
+    <color name="ic_launcher_background">#12399B</color>
+</resources>

@@ -1,0 +1,102 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- الاتصال بالـ API بتاع PROMAX ERP -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- لوكيشن التشيك إن — بيتسجل مع الزيارة والفاتورة -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+
+    <!-- تصوير المكان والأوراق ورفع الملفات -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32"/>
+
+    <!-- ⚠️ إشعارات فاير بيز — إجباري من أندرويد 13 (API 33).
+         من غيرها الإشعار بيوصل التليفون فعلاً ومايتعرضش، وشكله زي
+         إن السيرفر مابعتش. الأبلكيشن بيطلب الإذن في `Push.init()`. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
+    <!-- ⚠️ التحديث الذاتي — الأبلكيشن مش على جوجل بلاي فبينزّل الـAPK
+         من السيرفر ويفتح شاشة التسطيب. من غير الإذن ده أندرويد بيرفض
+         فتح الشاشة أصلاً (من API 26). المستخدم لسه بيوافق يدوي. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+
+    <application
+        android:label="ProMax"
+        android:name="${applicationName}"
+        android:icon="@mipmap/ic_launcher"
+        android:enableOnBackInvokedCallback="true"
+        android:usesCleartextTraffic="true">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <!-- Specifies an Android theme to apply to this Activity as soon as
+                 the Android process has started. This theme is visible to the user
+                 while the Flutter UI initializes. After that, this theme continues
+                 to determine the Window background behind the Flutter UI. -->
+            <meta-data
+              android:name="io.flutter.embedding.android.NormalTheme"
+              android:resource="@style/NormalTheme"
+              />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+        <!-- ⚠️ **قناة الإشعارات الافتراضية.** من غيرها أندرويد بيحط
+             إشعارات فاير بيز في قناة «Miscellaneous» — أهميتها
+             منخفضة، يعني **مفيش صوت ومفيش ظهور على القفل**. المندوب
+             كان هيلاقي الإشعار في الشيد بس ومايحسّش بيه. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="promax_ops" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/royal_blue" />
+
+        <!-- ⚠️ **من غير السطر ده أندرويد بيستخدم أيقونة التطبيق** —
+             ويرميها tint أبيض/رمادي، فاللوجو الملوّن بيتحوّل لدايرة
+             صمّاء مالهاش معنى (حصل فعلاً 2026-08-07). الأيقونة دي
+             سلويت أبيض مرسوم مخصوص لشريط الحالة. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
+
+        <!-- ⚠️ **الـauthority لازم يطابق الكود بالحرف**:
+             `"$packageName.fileprovider"` في MainActivity. أي اختلاف
+             بيرمي IllegalArgumentException وقت التسطيب. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- Don't delete the meta-data below.
+             This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+    </application>
+    <!-- Required to query activities that can process text, see:
+         https://developer.android.com/training/package-visibility and
+         https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
+
+         In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT"/>
+            <data android:mimeType="text/plain"/>
+        </intent>
+    </queries>
+</manifest>
