@@ -14,6 +14,7 @@ import 'screens/office_home.dart';
 import 'screens/login.dart';
 import 'screens/rep_home.dart';
 import 'screens/courier_home.dart';
+import 'screens/admin_home.dart';
 import 'screens/manager_home.dart';
 import 'screens/promoter_home.dart';
 import 'screens/splash.dart';
@@ -267,7 +268,10 @@ class Root extends StatelessWidget {
           'sales_agent' => const RepHome(),
           'driver' => const CourierHome(),
           'promoter' => const PromoterHome(),
-          'manager' || 'admin' => const ManagerHome(),
+          // ⚠️ الأدمن اتفصل عن المدير (٢٨/٨) — شاشة إدارة كاملة
+          // بمعادلة الشركة و«بعيون مدير»، من غير التوابع الميدانية
+          'manager' => const ManagerHome(),
+          'admin' => const AdminHome(),
           'accountant' || 'warehouse_keeper' => const OfficeHome(),
           _ => const UnknownRoleScreen(),
         };

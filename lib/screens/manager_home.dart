@@ -10,6 +10,7 @@ import 'shared.dart';
 import 'journey.dart';
 import 'zones.dart';
 import 'supply_orders.dart';
+import 'manager_dash.dart';
 import 'manager_reps.dart';
 import 'manager_approvals.dart';
 import 'manager_replenishments.dart';
@@ -288,7 +289,17 @@ class ManagerDashboard extends StatelessWidget {
                     color: const Color(0xFF0F766E)),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 14),
+
+            // ═══ بورد المعادلة (٢٨/٨) — نفس معادلة داشبورد الـERP
+            // بسكوب الفريق، بيدير تحميله بنفسه (Api.I مباشرة) ═══
+            ManagerEquationBoard(isAdmin: s.user?.role == 'admin'),
+            const SizedBox(height: 14),
+
+            // ═══ شبكة أدوات الإدارة (٢٨/٨): المهام · المحتملين ·
+            // اللايف · العمولات — المدخل الدائم للشاشات الجديدة ═══
+            const ManagerToolsGrid(),
+            const SizedBox(height: 12),
 
             // ═══ عهدة المدير الميداني (١١/٨) — مدخل الاستلام ═══
             // ⚠️ العهدة مش تاب في شريط المدير (٦ تابات خلاص) — الكارت

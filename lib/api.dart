@@ -791,6 +791,103 @@ class Api {
 
   Future<Map<String, dynamic>> cancelReplenishment(int requestId, {String? note}) =>
       post('/manager/replenishments/$requestId/cancel', {'note': note});
+
+  // ═══ شاشات المدير/الأدمن المطورة (٢٨/٨) ═══
+
+  /// داشبورد المعادلة — مبيعات − تحصيل − مرتجعات = صافي الحركة.
+  /// المدير مقصوص على فريقه من السيرفر؛ [managerId] للأدمن بس
+  /// («بعيون مدير»)، والسيرفر بيتجاهله من أي حد تاني.
+  Future<Map<String, dynamic>> managerDashboard(
+      {String? from, String? to, int? managerId}) {
+    final q = <String>[
+      if (from != null) 'from=$from',
+      if (to != null) 'to=$to',
+      if (managerId != null) 'manager_id=$managerId',
+    ].join('&');
+
+    return get('/manager/dashboard${q.isEmpty ? '' : '?$q'}');
+  }
+
+  /// بورد اللايف — مناديب الفريق لحظياً + عربيات iTrack
+  Future<Map<String, dynamic>> managerLive() => get('/manager/live');
+
+  /// متابعة ليدات الفريق — مجدولين النهارده وأرقام الأسبوع لكل مندوب
+  Future<Map<String, dynamic>> managerLeadsWatch() => get('/manager/leads');
+
+  /// KPI والعمولات — قراءة بس، [period] بصيغة YYYY-MM
+  Future<Map<String, dynamic>> managerKpi(String period) =>
+      get('/manager/kpi?period=$period');
+
+  // ═══ إدارة المهام على الموبايل (٢٨/٨) ═══
+
+  Future<Map<String, dynamic>> tasksBoard() => get('/tasks');
+
+  /// إنشاء مهمة — multipart عشان الصور المرفقة (زي فورم الداشبورد)
+  Future<Map<String, dynamic>> taskCreate({
+    required String title,
+    String? description,
+    required int assignedTo,
+    required String priority,
+    String? deadline,
+    List<String> photoPaths = const [],
+  }) async {
+    final req = http.MultipartRequest('POST', _uri('/tasks'))
+      ..headers.addAll({
+        'Accept': 'application/json',
+        'X-App-Locale': L.locale,
+        if (token != null) 'Authorization': 'Bearer $token',
+      });
+
+    req.fields['title'] = title;
+    if (description != null && description.isNotEmpty) {
+      req.fields['description'] = description;
+    }
+    req.fields['assigned_to'] = assignedTo.toString();
+    req.fields['priority'] = priority;
+    if (deadline != null && deadline.isNotEmpty) {
+      req.fields['deadline'] = deadline;
+    }
+    for (var i = 0; i < photoPaths.length; i++) {
+      req.files
+          .add(await http.MultipartFile.fromPath('files[$i]', photoPaths[i]));
+    }
+
+    final streamed = await req.send().timeout(const Duration(seconds: 60));
+    return _decode(await http.Response.fromStream(streamed));
+  }
+
+  Future<Map<String, dynamic>> taskShow(int id) => get('/tasks/$id');
+
+  /// رسالة شات — نص و/أو صورة (multipart لو فيه صورة)
+  Future<Map<String, dynamic>> taskComment(int id,
+      {String? body, String? photoPath}) async {
+    if (photoPath == null) {
+      return post('/tasks/$id/comment', {'body': body ?? ''});
+    }
+
+    final req = http.MultipartRequest('POST', _uri('/tasks/$id/comment'))
+      ..headers.addAll({
+        'Accept': 'application/json',
+        'X-App-Locale': L.locale,
+        if (token != null) 'Authorization': 'Bearer $token',
+      });
+    if (body != null && body.isNotEmpty) req.fields['body'] = body;
+    req.files.add(await http.MultipartFile.fromPath('file', photoPath));
+
+    final streamed = await req.send().timeout(const Duration(seconds: 60));
+    return _decode(await http.Response.fromStream(streamed));
+  }
+
+  /// بولينج الشات — الرسايل بعد آخر id + حالة المهمة
+  Future<Map<String, dynamic>> taskComments(int id, int after) =>
+      get('/tasks/$id/comments?after=$after');
+
+  Future<Map<String, dynamic>> taskSubmit(int id) => post('/tasks/$id/submit');
+
+  Future<Map<String, dynamic>> taskApprove(int id) => post('/tasks/$id/approve');
+
+  Future<Map<String, dynamic>> taskReject(int id, {String? reason}) =>
+      post('/tasks/$id/reject', {'reason': reason ?? ''});
 }
 
 class ApiException implements Exception {
