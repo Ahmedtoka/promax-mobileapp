@@ -8,6 +8,7 @@ import '../session.dart';
 import 'attendance.dart';
 import 'account.dart';
 import 'shared.dart';
+import 'journey.dart';
 import 'promoter_visit.dart';
 import 'supply_orders.dart';
 
@@ -20,15 +21,18 @@ class PromoterHome extends StatefulWidget {
 class _PromoterHomeState extends State<PromoterHome> with NavTarget {
   int _index = 0;
 
-  // ═══ وجهة الإشعار (٨/٨/٢٠٢٦ — واتوسعت ١١/٨ مساءً) ═══
+  // ═══ وجهة الإشعار (٨/٨/٢٠٢٦ — واتوسعت ١١/٨، واتعدلت ٢٨/٨) ═══
   // البروموتر بياخد قرارات طلبات الريفيل بتاعته، وبقى يستلم
   // ويسلّم أوامر توريد («نفس المندوب اللي طلبه» — قرار المالك).
-  // الرئيسية ٠ · الفروع ١ · الريفيل ٢ · العهدة ٣ · التوريد ٤ · التتبع ٥
+  // ⚠️ **تاب العهدة اتشال (٢٨/٨ — بلاغ المالك: «البروموتر مش بيبقى
+  // معاه عهدة») ودخل مكانه خط السير.** العهدة بقت كارت في الرئيسية
+  // بيظهر بس لما يكون فيه فعلاً حاجة (دوكترين «كل شاشة ليها مدخل»).
+  // الرئيسية ٠ · الفروع ١ · الريفيل ٢ · خط السير ٣ · التوريد ٤ · التتبع ٥
   @override
   int? tabForLink(String kind) => switch (kind) {
         'replenishment' => 2,
         'client' => 1,
-        'pick' || 'custody' => 3,
+        'journey' => 3,
         'po' => 4,
         'home' => 0,
         _ => null,
@@ -37,14 +41,25 @@ class _PromoterHomeState extends State<PromoterHome> with NavTarget {
   @override
   void goToTab(int index) => setState(() => _index = index);
 
+  // ⚠️ لينكات `pick:`/`custody:` مابقتش تاب — بيفتحوا شاشة العهدة
+  // فوق الرئيسية بدل ما يضيعوا في `AppNav.pending` بلا قارئ
+  // (نفس نمط المدير ١١/٨)
+  @override
+  void openLink(String link) {
+    if (AppNav.kindOf(link) == 'pick' || AppNav.kindOf(link) == 'custody') {
+      Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const CustodyScreen()));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: Session.I,
       builder: (context, _) {
-        // شارات زي تابات المندوب: أوامر تجهيز مستنية استلامه،
+        // شارات زي تابات المندوب: محطات خطة النهارده الفاضلة،
         // وأوامر توريد لسه ماتسلمتش
-        final ready = Session.I.readyPicks;
+        final pending = Session.I.journeySummary.pending;
         final openPos =
             Session.I.pos.where((p) => p.status != 'delivered').length;
 
@@ -55,7 +70,10 @@ class _PromoterHomeState extends State<PromoterHome> with NavTarget {
               PromoterDashboard(),
               BranchesScreen(),
               ReplenishmentsScreen(),
-              CustodyScreen(),
+              // ⚠️ خط السير بدل العهدة (٢٨/٨) — نفس شاشة المندوب،
+              // الداتا من نفس مفاتيح الجلسة اللي _refreshPromoter
+              // بقى بيملاها
+              JourneyScreen(),
               SupplyOrdersScreen(),
               TrackingScreen(),
             ],
@@ -78,12 +96,12 @@ class _PromoterHomeState extends State<PromoterHome> with NavTarget {
                   label: L.t('refill_requests')),
               NavigationDestination(
                   icon: Badge(
-                    isLabelVisible: ready > 0,
-                    label: Text('$ready'),
-                    child: const Icon(Icons.inventory_2_outlined),
+                    isLabelVisible: pending > 0,
+                    label: Text('$pending'),
+                    child: const Icon(Icons.alt_route_outlined),
                   ),
-                  selectedIcon: const Icon(Icons.inventory_2),
-                  label: L.t('custody')),
+                  selectedIcon: const Icon(Icons.alt_route),
+                  label: L.t('journey')),
               NavigationDestination(
                   icon: Badge(
                     isLabelVisible: openPos > 0,
@@ -217,19 +235,95 @@ class PromoterDashboard extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            Text(L.t('branches_today'),
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            if (s.branches.isEmpty)
+            // ═══ العهدة — كارت شرطي بدل التاب (٢٨/٨) ═══
+            // البروموتر عادةً مايشيلش عهدة، فالتاب اتشال وخط السير
+            // خد مكانه. الكارت ده بيظهر **بس** لو فيه فعلاً بضاعة
+            // عليه أو أمر تجهيز مستنيه — دوكترين «كل شاشة ليها مدخل»
+            // من غير ما تاب فاضي ياخد مكان في الشريط.
+            if (s.custody.remainingUnits > 0 || s.readyPicks > 0) ...[
               Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Center(
-                      child: Text(L.t('no_branches_assigned'),
-                          style: TextStyle(color: Colors.grey.shade600))),
+                child: ListTile(
+                  leading: Badge(
+                    isLabelVisible: s.readyPicks > 0,
+                    label: Text('${s.readyPicks}'),
+                    child: const Icon(Icons.inventory_2_outlined,
+                        color: Color(0xFFEA8C1C)),
+                  ),
+                  title: Text(L.t('custody'),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 14)),
+                  subtitle: Text(
+                      '${L.t('custody_left')}: ${s.custody.remainingUnits}',
+                      style: const TextStyle(fontSize: 11.5)),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => const CustodyScreen())),
                 ),
               ),
-            ...s.branches.take(6).map((b) => BranchTile(branch: b)),
+              const SizedBox(height: 8),
+            ],
+
+            // ═══ «فروع النهارده» (اتوضحت ٢٨/٨ — بلاغ «جايب العملاء
+            // منين؟») ═══
+            // لو المالك جدوله خط سير، القايمة هي **محطات الخطة**
+            // بترتيبها. لو مفيش خطة، فولباك فروع منطقته زي زمان —
+            // بعنوان مختلف عشان الشاشة تقول مصدرها.
+            if (s.journey.isNotEmpty) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(L.t('journey_today'),
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold)),
+                  Text(
+                      '${s.journeySummary.done}/${s.journeySummary.planned}',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.grey.shade600)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // المحطة بتترسم بكارت الفرع بتاعها (فيه زرار الزيارة
+              // وحالتها) — ولو المحطة عميل مش في فروع زونه (المدير
+              // حاطه في الخطة) بنرسم كارت مبسط بدل ما نسقطه في صمت
+              ...s.journey.take(6).map((stop) {
+                final branch =
+                    firstOrNull(s.branches.where((b) => b.id == stop.clientId));
+
+                return branch != null
+                    ? BranchTile(branch: branch)
+                    : Card(
+                        child: ListTile(
+                          dense: true,
+                          leading: const Icon(Icons.storefront_outlined),
+                          title: Text(stop.name,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13)),
+                          subtitle: Text(stop.address,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 11)),
+                        ),
+                      );
+              }),
+            ] else ...[
+              Text(L.t('zone_branches'),
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              if (s.branches.isEmpty)
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Center(
+                        child: Text(L.t('no_branches_assigned'),
+                            style: TextStyle(color: Colors.grey.shade600))),
+                  ),
+                ),
+              ...s.branches.take(6).map((b) => BranchTile(branch: b)),
+            ],
           ],
         ),
       ),

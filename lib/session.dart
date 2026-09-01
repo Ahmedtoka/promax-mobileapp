@@ -1023,6 +1023,12 @@ class Session extends ChangeNotifier {
     }
 
     promoStats = PromoterStats.fromJson(d['today'] ?? {});
+
+    // ⚠️ **خط السير للبروموتر كمان** (بلاغ المالك ٢٨/٨): الجدولة
+    // كانت بتتحفظ في الـERP والسيرفر بقى بيبعتها — من غير السطر ده
+    // تاب خط السير بيفضل فاضي مهما المالك جدول.
+    _readJourney(d['journey']);
+
     branches =
         ((d['branches'] ?? []) as List).map((e) => Branch.fromJson(e)).toList();
     catalog = ((d['products'] ?? []) as List)

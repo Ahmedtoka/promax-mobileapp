@@ -4,7 +4,9 @@ import '../brand.dart';
 import '../l10n.dart';
 import '../locator.dart';
 import '../models.dart';
+import '../promoter_models.dart';
 import '../session.dart';
+import 'promoter_visit.dart' show VisitScreen;
 import 'zones.dart' show ClientScreen, ZonesScreen, kmTo, kmLabel;
 
 /// ═══════════════════════════════════════════════════════════════
@@ -50,7 +52,19 @@ class _JourneyScreenState extends State<JourneyScreen> {
 
   /// ⚠️ **الفلو كله من صفحة العميل** (قرار المالك 2026-08-03):
   /// الضغط على المحطة بيفتح صفحة العميل — التشيك إن من هناك.
+  ///
+  /// ⚠️ **إلا البروموتر (٢٨/٨)** — الشاشة دي بقت تابه بعد ما خط
+  /// سيره وصل للأبلكيشن، وزيارته **زيارة رف** (MerchVisit): صورة
+  /// قبل → ريفيل → صورة بعد. فتح صفحة العميل كان هيوديه لفلو
+  /// البيع والفاتورة اللي مالوش فيه أصلاً.
   Future<void> _open(JourneyStop stop) async {
+    if (_s.user?.isPromoter == true) {
+      await _openMerch(stop);
+      if (mounted) setState(() {});
+
+      return;
+    }
+
     final client = _s.clientForStop(stop) ?? stop.asClient();
 
     await Navigator.push(
@@ -59,6 +73,50 @@ class _JourneyScreenState extends State<JourneyScreen> {
     );
 
     if (mounted) setState(() {});
+  }
+
+  /// محطة البروموتر — نفس منطق كارت الفرع في شاشته بالحرف
+  Future<void> _openMerch(JourneyStop stop) async {
+    // ⚠️ امسكهم قبل أي await — الرسالة بعد الرجوع بتضيع (درس ٩/٨)
+    final messenger = ScaffoldMessenger.of(context);
+    final nav = Navigator.of(context);
+    final s = Session.I;
+
+    // زيارة مفتوحة على نفس الفرع؟ كمّلها
+    if (s.openMerchVisit != null && s.openMerchVisit!.clientId == stop.clientId) {
+      await nav.push(MaterialPageRoute(
+          builder: (_) => VisitScreen(visit: s.openMerchVisit!)));
+
+      return;
+    }
+
+    final branch = firstOrNull(s.branches.where((b) => b.id == stop.clientId));
+
+    if (branch == null) {
+      // المدير حط في خطته عميل مش من فروع زونه — نقول بدل ما نسكت
+      messenger.showSnackBar(SnackBar(content: Text(L.t('no_branches_assigned'))));
+
+      return;
+    }
+
+    if (branch.status == BranchVisitStatus.done) {
+      messenger.showSnackBar(SnackBar(content: Text(L.t('branch_visited'))));
+
+      return;
+    }
+
+    final err = await s.startMerchVisit(branch);
+
+    if (err != null) {
+      messenger.showSnackBar(SnackBar(content: Text(err)));
+
+      return;
+    }
+
+    if (s.openMerchVisit != null) {
+      await nav.push(MaterialPageRoute(
+          builder: (_) => VisitScreen(visit: s.openMerchVisit!)));
+    }
   }
 
   /// رقم بفواصل من غير عملة — أرقام التايم لاين
