@@ -188,7 +188,7 @@ class SaleReviewScreen extends StatelessWidget {
                     if (l.$5 != null) ...[
                       ClipRRect(
                         borderRadius: BorderRadius.circular(9),
-                        child: Image.network(l.$5!,
+                        child: Image.network(l.$5!, cacheWidth: 800,
                             width: 42,
                             height: 42,
                             fit: BoxFit.contain,

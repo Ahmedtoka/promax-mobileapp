@@ -13,6 +13,7 @@ import '../l10n.dart';
 import '../locator.dart';
 
 import '../models.dart';
+import '../promoter_models.dart';
 import '../session.dart';
 import 'shared.dart';
 import 'sale.dart';
@@ -20,6 +21,8 @@ import 'client_return.dart';
 import 'gifts.dart';
 import 'new_client.dart';
 import 'collect.dart';
+// زيارة المنسق زيارة رف — مدخلها من المناطق كمان (٢٨/٨)
+import 'promoter_visit.dart' show openMerchBranch;
 import 'shelf_photos.dart';
 import 'goods_request.dart';
 import 'client_location.dart';
@@ -973,8 +976,31 @@ class ClientTile extends StatelessWidget {
     final done = c.status == VisitStatus.done;
     final km = kmTo(pos, c.lat, c.lng);
 
-    void open() => Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => ClientScreen(client: c)));
+    // ⚠️ **المنسق زيارته زيارة رف** (إعادة البناء ٢٨/٨): مفيش بيع
+    // ولا مرتجع ولا تحصيل عنده — الضغطة بتفتح/بتبدأ MerchVisit
+    // (صور قبل → ريفيل/طلب أوردر → صور بعد) بدل شاشة البيع.
+    Future<void> open() async {
+      final s = Session.I;
+
+      if (s.user?.isPromoter != true) {
+        Navigator.of(context)
+            .push(MaterialPageRoute(builder: (_) => ClientScreen(client: c)));
+
+        return;
+      }
+
+      // ⚠️ الفرع من قايمة المنسق لو موجود — عشان حالة «اتزار النهارده»
+      // تتعرف هنا زي خط السير، مش كارت مؤقت حالته pending دايماً
+      final branch = firstOrNull(s.branches.where((b) => b.id == c.id)) ??
+          Branch.fromJson({
+            'id': c.id,
+            'name': c.name,
+            'address': c.address,
+            'phone': c.phone,
+          });
+
+      await openMerchBranch(context, branch);
+    }
 
     return Card(
       margin: const EdgeInsets.only(bottom: 9),
@@ -2081,7 +2107,7 @@ class _ClientScreenState extends State<ClientScreen> {
                         ),
                         clipBehavior: Clip.antiAlias,
                         padding: const EdgeInsets.all(3),
-                        child: Image.network(u,
+                        child: Image.network(u, cacheWidth: 800,
                             fit: BoxFit.contain,
                             errorBuilder: (_, __, ___) =>
                                 const SizedBox.shrink()),
@@ -2264,6 +2290,14 @@ class _ClientScreenState extends State<ClientScreen> {
     //
     // ⚠️ (١١/٨ مساءً) المدير بيشوف كل الأكشنات الستة زي المندوب —
     // قرار المالك: «الشركة لسه صغيرة، المدير هيبيع ويتصفّى».
+    //
+    // ⚠️ **البروموتر بلا تحصيل ولا صور رف** (٩/٩/٢٠٢٦): الـAPI بيرفض
+    // الاتنين للبروموتر (`api.role:sales_agent,manager` على
+    // `/visits/{id}/collect` و`/shelf-photo` — قرار ٨/٨). الزرارين كانوا
+    // بيفتحوا فورم كامل وبعدين 403 عند الحفظ. الرف عنده زيارة رف
+    // (MerchVisit) بصورها، والتحصيل مش شغله أصلاً.
+    final promoter = Session.I.isPromoter;
+
     out.addAll([
       // ⚠️ **ممنوع stretch هنا** (بلاغ ٢١/٨ مساءً): الصف جوه عمود
       // بارتفاع مفتوح (ListView)، وstretch كانت بتمطّط الخلايا لما
@@ -2276,18 +2310,20 @@ class _ClientScreenState extends State<ClientScreen> {
           onTap: () => Navigator.of(context).push(MaterialPageRoute(
               builder: (_) => SaleScreen(client: c))),
         ),
-        const SizedBox(width: 10),
-        _actionCell(
-          icon: Icons.payments_outlined,
-          color: Brand.green,
-          label: L.t('collect_btn'),
-          sub: c.balance > 0
-              ? L.t('cc_on_him_n', {'n': _n(c.balance)})
-              : null,
-          subColor: Brand.orange,
-          onTap: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => CollectScreen(client: c))),
-        ),
+        if (!promoter) ...[
+          const SizedBox(width: 10),
+          _actionCell(
+            icon: Icons.payments_outlined,
+            color: Brand.green,
+            label: L.t('collect_btn'),
+            sub: c.balance > 0
+                ? L.t('cc_on_him_n', {'n': _n(c.balance)})
+                : null,
+            subColor: Brand.orange,
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => CollectScreen(client: c))),
+          ),
+        ],
       ]),
       const SizedBox(height: 10),
       // ⚠️ **ممنوع stretch هنا** (بلاغ ٢١/٨ مساءً): الصف جوه عمود
@@ -2301,14 +2337,16 @@ class _ClientScreenState extends State<ClientScreen> {
           onTap: () => Navigator.of(context).push(MaterialPageRoute(
               builder: (_) => ClientReturnScreen(client: c))),
         ),
-        const SizedBox(width: 10),
-        _actionCell(
-          icon: Icons.photo_camera_outlined,
-          color: Brand.blue500,
-          label: L.t('shelf_btn'),
-          onTap: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => ShelfPhotosScreen(client: c))),
-        ),
+        if (!promoter) ...[
+          const SizedBox(width: 10),
+          _actionCell(
+            icon: Icons.photo_camera_outlined,
+            color: Brand.blue500,
+            label: L.t('shelf_btn'),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => ShelfPhotosScreen(client: c))),
+          ),
+        ],
       ]),
       const SizedBox(height: 10),
       // ⚠️ **ممنوع stretch هنا** (بلاغ ٢١/٨ مساءً): الصف جوه عمود

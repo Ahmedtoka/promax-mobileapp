@@ -4,6 +4,10 @@ import 'l10n.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+/// فك JSON في isolate منفصل — بيتنادى من `compute` للردود الكبيرة
+Map<String, dynamic> _parseJsonMap(String body) =>
+    jsonDecode(body) as Map<String, dynamic>;
+
 /// عميل الـ API بتاع PROMAX ERP
 class Api {
   static final Api I = Api._();
@@ -83,7 +87,11 @@ class Api {
     final body = r.body.isEmpty ? '{}' : r.body;
     late final Map<String, dynamic> json;
     try {
-      json = jsonDecode(body) as Map<String, dynamic>;
+      // ⚠️ الرد الكبير (البوت ستراب ~1 ميجا) بيتفك في isolate تاني —
+      // على خيط الواجهة كان بيجمّد الشاشة لحظة مع كل مزامنة (تدقيق ١٥/٩)
+      json = body.length > 100000
+          ? await compute(_parseJsonMap, body)
+          : jsonDecode(body) as Map<String, dynamic>;
     } catch (_) {
       // السيرفر رجّع HTML (صفحة خطأ) — نطلّع أول سطر مفيد منها
       final plain = body
@@ -232,7 +240,9 @@ class Api {
   // ═══ تاب العملاء المحتملين (بايبلاين ٢٦/٨) ═══
 
   /// ليداتي بالمناطق — المفتوحة + المكسوبة الشهر ده
-  Future<Map<String, dynamic>> myLeads() => get('/leads/mine');
+  // اللوكيشن اختياري — السيرفر بيرتب الليدات «الأقرب فالأقرب» منه (٦/٩)
+  Future<Map<String, dynamic>> myLeads({double? lat, double? lng}) =>
+      get(lat == null ? '/leads/mine' : '/leads/mine?lat=$lat&lng=$lng');
 
   /// تأكيد البيانات من الميدان — multipart عشان صورة المكان
   /// (فلو الليد المطور ٢٦/٨). النقطة الأولى في الحصاد.
@@ -667,8 +677,6 @@ class Api {
   Future<Map<String, dynamic>> keeperPicks({bool history = false}) =>
       get('/keeper/picks${history ? '?history=1' : ''}');
 
-  Future<Map<String, dynamic>> keeperPick(int id) => get('/keeper/picks/$id');
-
   Future<Map<String, dynamic>> keeperStart(int id) =>
       post('/keeper/picks/$id/start');
 
@@ -688,8 +696,6 @@ class Api {
   Future<Map<String, dynamic>> appVersion() => get('/app-version');
 
   // ═══ الحضور والانصراف — HR (2026-08-08) ═══
-
-  Future<Map<String, dynamic>> attendance() => get('/attendance');
 
   /// `type`: in · break · back · out
   Future<Map<String, dynamic>> punch(String type, {double? lat, double? lng}) =>
@@ -722,8 +728,16 @@ class Api {
 
   Future<Map<String, dynamic>> promoterBootstrap() => get('/promoter/bootstrap');
 
-  Future<Map<String, dynamic>> startMerchVisit(int clientId) =>
-      post('/promoter/visits', {'client_id': clientId});
+  /// بداية زيارة رف — الإحداثيات اختيارية (السيرفر بيرجع لموقع الفرع
+  /// لو مش متاحة) لكن من غيرها كل زيارات البروموتر كانت بتتسجّل على
+  /// عنوان الفرع مش مكانه الفعلي (٩/٩)
+  Future<Map<String, dynamic>> startMerchVisit(int clientId,
+          {double? lat, double? lng}) =>
+      post('/promoter/visits', {
+        'client_id': clientId,
+        if (lat != null) 'lat': lat,
+        if (lng != null) 'lng': lng,
+      });
 
   /// رفع صورة الرف — stage: before / after
   Future<Map<String, dynamic>> uploadShelfPhoto(
@@ -756,8 +770,19 @@ class Api {
         'note': note,
       });
 
-  Future<Map<String, dynamic>> closeMerchVisit(int visitId) =>
-      post('/promoter/visits/$visitId/close');
+  /// جرد الرف — القايمة كاملة كل مرة، والسيرفر بيستبدل بيها جرد الزيارة
+  Future<Map<String, dynamic>> saveShelfCount(
+          int visitId, List<Map<String, dynamic>> lines) =>
+      post('/promoter/visits/$visitId/count', {'lines': lines});
+
+  /// `noPhotos` = المنسق بيقفل من غير صورة قبل/بعد بسبب مكتوب —
+  /// السيرفر بيعلّم الزيارة وبيبعت تنبيه لمديره
+  Future<Map<String, dynamic>> closeMerchVisit(int visitId,
+          {bool noPhotos = false, String? reason}) =>
+      post('/promoter/visits/$visitId/close', {
+        if (noPhotos) 'no_photos': true,
+        if (noPhotos) 'no_photo_reason': reason,
+      });
 
   // ---------- المدير ----------
 

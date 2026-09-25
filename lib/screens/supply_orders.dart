@@ -1066,8 +1066,7 @@ class _PoImageScreen extends StatelessWidget {
         child: InteractiveViewer(
           minScale: 0.8,
           maxScale: 5,
-          child: Image.network(
-            url,
+          child: Image.network(url, cacheWidth: 800,
             fit: BoxFit.contain,
             // ⚠️ حالة الفشل لازم تقول سبب — صورة سودا فاضية بتخلّي
             // المندوب يفتكر إن الأبلكيشن واقف
@@ -1281,9 +1280,6 @@ class _PoDeliveryScreenState extends State<PoDeliveryScreen> {
         },
     ];
 
-    final totalPieces =
-        po.items.fold<int>(0, (t, i) => t + _pieces(i));
-
     // قيمة اللي هيتسلّم فعلاً — بأسعار بنود الأمر
     final deliveredValue =
         po.items.fold<double>(0, (t, i) => t + _pieces(i) * i.price);
@@ -1456,7 +1452,7 @@ class _PoDeliveryScreenState extends State<PoDeliveryScreen> {
                             if (i.image != null) ...[
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
-                                child: Image.network(i.image!,
+                                child: Image.network(i.image!, cacheWidth: 800,
                                     width: 56,
                                     height: 56,
                                     fit: BoxFit.contain,

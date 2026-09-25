@@ -260,7 +260,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
                   if (l.$3 != null) ...[
                     ClipRRect(
                       borderRadius: BorderRadius.circular(10),
-                      child: Image.network(l.$3!,
+                      child: Image.network(l.$3!, cacheWidth: 800,
                           width: 46,
                           height: 46,
                           fit: BoxFit.contain,

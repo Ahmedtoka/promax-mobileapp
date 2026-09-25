@@ -198,8 +198,7 @@ class _MultiItemPickerScreenState extends State<MultiItemPickerScreen> {
           color: Colors.white,
           child: e.image == null
               ? _thumbFallback()
-              : Image.network(
-                  e.image!,
+              : Image.network(e.image!, cacheWidth: 800,
                   fit: BoxFit.contain,
                   errorBuilder: (_, __, ___) => _thumbFallback(),
                 ),

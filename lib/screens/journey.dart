@@ -6,7 +6,7 @@ import '../locator.dart';
 import '../models.dart';
 import '../promoter_models.dart';
 import '../session.dart';
-import 'promoter_visit.dart' show VisitScreen;
+import 'promoter_visit.dart' show openMerchBranch;
 import 'zones.dart' show ClientScreen, ZonesScreen, kmTo, kmLabel;
 
 /// ═══════════════════════════════════════════════════════════════
@@ -77,46 +77,24 @@ class _JourneyScreenState extends State<JourneyScreen> {
 
   /// محطة البروموتر — نفس منطق كارت الفرع في شاشته بالحرف
   Future<void> _openMerch(JourneyStop stop) async {
-    // ⚠️ امسكهم قبل أي await — الرسالة بعد الرجوع بتضيع (درس ٩/٨)
-    final messenger = ScaffoldMessenger.of(context);
-    final nav = Navigator.of(context);
     final s = Session.I;
 
-    // زيارة مفتوحة على نفس الفرع؟ كمّلها
-    if (s.openMerchVisit != null && s.openMerchVisit!.clientId == stop.clientId) {
-      await nav.push(MaterialPageRoute(
-          builder: (_) => VisitScreen(visit: s.openMerchVisit!)));
+    // ⚠️ **بدء الزيارة مايعتمدش على قايمة الفروع** (٢٨/٨ — بلاغ
+    // «مفيش فروع متخصصة ليك» تاني): `startMerchVisit` محتاجة رقم
+    // العميل بس، والمحطة فيها كل بياناته. لو الفرع مش في القايمة
+    // (بوت ستراب قديم متكاش، أو عميل بره الزون) بنبني كارت مؤقت
+    // من المحطة ونكمّل — والحارس الحقيقي عند السيرفر، اللي بقى
+    // بيسمح بأي عميل في خطة النهارده.
+    final branch = firstOrNull(s.branches.where((b) => b.id == stop.clientId)) ??
+        Branch.fromJson({
+          'id': stop.clientId,
+          'name': stop.name,
+          'address': stop.address,
+          'phone': stop.phone,
+        });
 
-      return;
-    }
-
-    final branch = firstOrNull(s.branches.where((b) => b.id == stop.clientId));
-
-    if (branch == null) {
-      // المدير حط في خطته عميل مش من فروع زونه — نقول بدل ما نسكت
-      messenger.showSnackBar(SnackBar(content: Text(L.t('no_branches_assigned'))));
-
-      return;
-    }
-
-    if (branch.status == BranchVisitStatus.done) {
-      messenger.showSnackBar(SnackBar(content: Text(L.t('branch_visited'))));
-
-      return;
-    }
-
-    final err = await s.startMerchVisit(branch);
-
-    if (err != null) {
-      messenger.showSnackBar(SnackBar(content: Text(err)));
-
-      return;
-    }
-
-    if (s.openMerchVisit != null) {
-      await nav.push(MaterialPageRoute(
-          builder: (_) => VisitScreen(visit: s.openMerchVisit!)));
-    }
+    // الباقي (اتزار النهارده؟ · مؤشر التحميل · البدء والفتح) في المكان المشترك
+    await openMerchBranch(context, branch);
   }
 
   /// رقم بفواصل من غير عملة — أرقام التايم لاين
@@ -148,10 +126,18 @@ class _JourneyScreenState extends State<JourneyScreen> {
   }
 
   Widget _body(BuildContext context) {
-    final stops = _s.journey;
+    // ═══ الفصل (طلب المالك ٢٨/٨): فروع السلاسل سكشن لوحدهم وبعديهم
+    // الكاش فان/الفرادى — كل مجموعة بترتيبها الأصلي، والترقيم عام
+    // على الاتنين. العناوين بتظهر **بس** لما الخطة تكون مخلوطة —
+    // خطة كلها نوع واحد بتتعرض زي زمان من غير دوشة.
+    final chains = _s.journey.where((s) => s.isChain).toList();
+    final solo = _s.journey.where((s) => !s.isChain).toList();
+    final stops = [...chains, ...solo];
+    final mixed = chains.isNotEmpty && solo.isNotEmpty;
     final sum = _s.journeySummary;
 
     // «الجاي دلوقتي» = الزيارة المفتوحة لو فيه، وإلا أول محطة لسه
+    // — على الترتيب المعروض نفسه
     final current = stops.indexWhere((s) => s.status == VisitStatus.inVisit);
     final next = current >= 0
         ? current
@@ -168,8 +154,17 @@ class _JourneyScreenState extends State<JourneyScreen> {
                   children: [
                     _header(stops, sum, next),
                     const SizedBox(height: 14),
-                    for (var i = 0; i < stops.length; i++)
-                      _stopRow(stops[i], i, i == next, i == stops.length - 1),
+                    if (mixed) _sectionHead('🔗 ${L.t('jr_chains')}', chains.length),
+                    for (var i = 0; i < chains.length; i++)
+                      _stopRow(chains[i], i, i == next,
+                          !mixed && i == stops.length - 1),
+                    if (mixed) _sectionHead('🚐 ${L.t('jr_cash_van')}', solo.length),
+                    for (var i = 0; i < solo.length; i++)
+                      _stopRow(
+                          solo[i],
+                          chains.length + i,
+                          chains.length + i == next,
+                          chains.length + i == stops.length - 1),
                     const SizedBox(height: 4),
                     _offPlanCard(),
                     const SizedBox(height: 24),
@@ -179,6 +174,31 @@ class _JourneyScreenState extends State<JourneyScreen> {
       ),
     );
   }
+
+  /// عنوان سكشن — بيفصل فروع السلاسل عن الكاش فان في التايم لاين
+  Widget _sectionHead(String title, int n) => Padding(
+        padding: const EdgeInsets.only(top: 6, bottom: 8),
+        child: Row(
+          children: [
+            Text(title,
+                style: const TextStyle(
+                    fontSize: 13.5, fontWeight: FontWeight.w800)),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text('$n',
+                  style: const TextStyle(
+                      fontSize: 11, fontWeight: FontWeight.w800)),
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: Divider(color: Colors.grey.shade300)),
+          ],
+        ),
+      );
 
   Widget _empty() => ListView(
         padding: const EdgeInsets.all(28),
@@ -693,6 +713,8 @@ class _JourneyScreenState extends State<JourneyScreen> {
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
+          // «برّه الخطة» بتفتح المناطق — بقت متملية للمنسق كمان
+          // بعد ما بوت سترابه بقى بيبعت `zones` بالتسكين (٢٨/٨)
           onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const ZonesScreen())),
           child: Container(

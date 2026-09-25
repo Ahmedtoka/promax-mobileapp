@@ -884,7 +884,7 @@ class _CustodyScreenState extends State<CustodyScreen> {
             child: p.image == null
                 ? Icon(Icons.inventory_2_outlined,
                     size: 16, color: Brand.muted)
-                : Image.network(p.image!,
+                : Image.network(p.image!, cacheWidth: 800,
                     fit: BoxFit.contain,
                     errorBuilder: (_, __, ___) => Icon(
                         Icons.inventory_2_outlined,
@@ -1011,7 +1011,7 @@ class _CustodyScreenState extends State<CustodyScreen> {
                   child: p.image == null
                       ? Icon(Icons.inventory_2_outlined,
                           size: 34, color: Brand.muted)
-                      : Image.network(p.image!,
+                      : Image.network(p.image!, cacheWidth: 800,
                           fit: BoxFit.contain,
                           errorBuilder: (_, __, ___) => Icon(
                               Icons.inventory_2_outlined,

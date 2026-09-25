@@ -54,7 +54,10 @@ class _LeadsScreenState extends State<LeadsScreen> {
     });
 
     try {
-      final res = await Api.I.myLeads();
+      // ترتيب المسافة (٦/٩): نبعت مكان المندوب فالسيرفر يرتب الليدات
+      // «الأقرب فالأقرب». فشل الـGPS مش بيوقف الشاشة — الترتيب القديم.
+      final pos = await Locator.get();
+      final res = await Api.I.myLeads(lat: pos?.$1, lng: pos?.$2);
       if (!mounted) return;
       setState(() {
         _zones = (res['zones'] as List? ?? const [])
@@ -192,6 +195,15 @@ class _LeadsScreenState extends State<LeadsScreen> {
     );
   }
 
+  /// مسافة مقروءة: 850 م / 1.2 كم — بمفاتيح اللغتين
+  String _distTxt(dynamic m) {
+    final v = (m is num) ? m.toDouble() : double.tryParse('$m') ?? 0;
+
+    return v < 1000
+        ? '${v.round()} ${L.t('unit_m')}'
+        : '${(v / 1000).toStringAsFixed(1)} ${L.t('unit_km')}';
+  }
+
   Widget _leadCard(Map<String, dynamic> l, {int? order}) {
     final st = '${l['status'] ?? 'new'}';
     final c = _stColor[st] ?? const Color(0xFF2563EB);
@@ -228,6 +240,22 @@ class _LeadsScreenState extends State<LeadsScreen> {
               ]),
               const SizedBox(height: 6),
               Wrap(spacing: 10, runSpacing: 4, children: [
+                // ليبل المسافة (٦/٩): الأقرب ليك / على بعد كذا من اللي قبله
+                if (l['near'] == 'first')
+                  Text(
+                      '📍 ${L.t('lead_nearest')}'
+                      '${l['dist_m'] != null ? ' • ${_distTxt(l['dist_m'])}' : ''}',
+                      style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF12399B),
+                          fontWeight: FontWeight.w800)),
+                if (l['near'] == 'next' && l['dist_m'] != null)
+                  Text(
+                      '↔ ${L.t('lead_dist_prev', {'n': _distTxt(l['dist_m'])})}',
+                      style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.w700)),
                 if ((l['category'] ?? '') != '')
                   Text('🏷 ${l['category']}',
                       style:

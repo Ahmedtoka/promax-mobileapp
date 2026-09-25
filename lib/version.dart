@@ -23,7 +23,7 @@
 /// وغلط نصياً — عشان كده فيه `isOlder` بدل ما نقارن الـstrings.
 library;
 
-const String appVersion = '1.1.5';
+const String appVersion = '2.5.1';
 
 /// هل الإصدار الحالي أقدم من `other`؟
 ///

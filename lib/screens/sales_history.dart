@@ -326,7 +326,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                       child: l.image == null
                           ? Icon(Icons.inventory_2_outlined,
                               size: 24, color: Brand.muted)
-                          : Image.network(l.image!,
+                          : Image.network(l.image!, cacheWidth: 800,
                               fit: BoxFit.contain,
                               errorBuilder: (_, __, ___) => Icon(
                                   Icons.inventory_2_outlined,

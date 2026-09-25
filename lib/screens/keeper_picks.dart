@@ -97,6 +97,92 @@ class _KeeperPicksBoardState extends State<KeeperPicksBoard> {
     }
   }
 
+  /// «جاهز» بالكميات الفعلية — كل صنف خانة مبدوءة بالمطلوب
+  Future<void> _readyDialog(_KeeperPick p) async {
+    if (p.items.isEmpty) {
+      await _action(() => Api.I.keeperReady(p.id));
+      return;
+    }
+    final ctrls = <int, TextEditingController>{};
+    for (final it in p.items) {
+      final id = (it['id'] as num?)?.toInt();
+      if (id == null) continue;
+      ctrls[id] = TextEditingController(text: '${it['qty_requested'] ?? 0}');
+    }
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(L.t('keeper_ready_title'),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+        content: SizedBox(
+          width: 360,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(L.t('keeper_ready_hint'),
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                const SizedBox(height: 10),
+                for (final it in p.items)
+                  if (ctrls.containsKey((it['id'] as num?)?.toInt()))
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text('${it['name'] ?? ''}',
+                                style: const TextStyle(fontSize: 12.5)),
+                          ),
+                          Text('/ ${it['qty_requested'] ?? 0}',
+                              style: TextStyle(
+                                  fontSize: 11.5, color: Colors.grey.shade600)),
+                          const SizedBox(width: 6),
+                          SizedBox(
+                            width: 72,
+                            child: TextField(
+                              controller: ctrls[(it['id'] as num).toInt()],
+                              keyboardType: TextInputType.number,
+                              textAlign: TextAlign.center,
+                              decoration: const InputDecoration(
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 8),
+                                  border: OutlineInputBorder()),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(ctx).maybePop(false),
+              child: Text(L.t('cancel'))),
+          FilledButton(
+              onPressed: () => Navigator.of(ctx).maybePop(true),
+              child: Text(L.t('keeper_confirm_ready'))),
+        ],
+      ),
+    );
+    final items = <Map<String, dynamic>>[];
+    var bad = false;
+    ctrls.forEach((id, c) {
+      final q = int.tryParse(c.text.trim());
+      if (q == null || q < 0) bad = true;
+      items.add({'id': id, 'qty': q ?? 0});
+      c.dispose();
+    });
+    if (ok != true) return;
+    if (bad) {
+      snack(context, L.t('keeper_qty_invalid'), bad: true);
+      return;
+    }
+    await _action(() => Api.I.keeperReady(p.id, items));
+  }
+
   Future<void> _action(Future<Map<String, dynamic>> Function() fn) async {
     setState(() => _busy = true);
     try {
@@ -274,10 +360,10 @@ class _KeeperPicksBoardState extends State<KeeperPicksBoard> {
                   backgroundColor: const Color(0xFF16A34A),
                 ),
                 label: Text(L.t('keeper_mark_ready')),
-                // ⚠️ الكميات كاملة من الموبايل — تعديل الكميات
-                // (نقص على الرف) لسه من شاشة الويب بمراجعة
-                onPressed:
-                    _busy ? null : () => _action(() => Api.I.keeperReady(p.id)),
+                // الكميات الفعلية من الموبايل (٢٥/٩): ديالوج بكل صنف
+                // وكميته المطلوبة، الأمين يقلّل لو الرف ناقص، والسيرفر
+                // بيسجّل النقص (`markReady` بياخد `items[id => qty]`)
+                onPressed: _busy ? null : () => _readyDialog(p),
               ),
             if (p.status == 'ready')
               Padding(

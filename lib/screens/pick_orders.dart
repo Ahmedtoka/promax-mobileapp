@@ -604,7 +604,7 @@ class _PickReceiveScreenState extends State<PickReceiveScreen> {
                   child: i.image == null
                       ? Icon(Icons.inventory_2_outlined,
                           size: 26, color: Colors.grey.shade400)
-                      : Image.network(i.image!,
+                      : Image.network(i.image!, cacheWidth: 800,
                           fit: BoxFit.contain,
                           errorBuilder: (_, __, ___) => Icon(
                               Icons.inventory_2_outlined,

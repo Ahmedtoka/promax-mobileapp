@@ -11,6 +11,7 @@ import 'shared.dart';
 import 'journey.dart';
 import 'promoter_visit.dart';
 import 'supply_orders.dart';
+import 'zones.dart' show ZonesScreen;
 
 class PromoterHome extends StatefulWidget {
   const PromoterHome({super.key});
@@ -21,19 +22,19 @@ class PromoterHome extends StatefulWidget {
 class _PromoterHomeState extends State<PromoterHome> with NavTarget {
   int _index = 0;
 
-  // ═══ وجهة الإشعار (٨/٨/٢٠٢٦ — واتوسعت ١١/٨، واتعدلت ٢٨/٨) ═══
-  // البروموتر بياخد قرارات طلبات الريفيل بتاعته، وبقى يستلم
-  // ويسلّم أوامر توريد («نفس المندوب اللي طلبه» — قرار المالك).
-  // ⚠️ **تاب العهدة اتشال (٢٨/٨ — بلاغ المالك: «البروموتر مش بيبقى
-  // معاه عهدة») ودخل مكانه خط السير.** العهدة بقت كارت في الرئيسية
-  // بيظهر بس لما يكون فيه فعلاً حاجة (دوكترين «كل شاشة ليها مدخل»).
-  // الرئيسية ٠ · الفروع ١ · الريفيل ٢ · خط السير ٣ · التوريد ٤ · التتبع ٥
+  // ═══ إعادة بناء شاشة المنسق (٢٨/٨ — قرار المالك بالحرف) ═══
+  //
+  // «هو يبقى عنده الرئيسية والمناطق وخط السير وصفحة الشخصية —
+  // وشيل أي حاجة ملهاش لازمة». ٤ تابات بس:
+  //   الرئيسية ٠ · المناطق ١ (بالتسكين الحقيقي) · خط السير ٢ · حسابي ٣
+  //
+  // الفروع والريفيل والتوريد والتتبع والعهدة **مش تابات** — الريفيل
+  // والتوريد والعهدة بقوا كروت مداخل في الرئيسية (دوكترين «كل شاشة
+  // ليها مدخل»)، والتتبع اتشال خالص.
   @override
   int? tabForLink(String kind) => switch (kind) {
-        'replenishment' => 2,
-        'client' => 1,
-        'journey' => 3,
-        'po' => 4,
+        'client' || 'zone' => 1,
+        'journey' => 2,
         'home' => 0,
         _ => null,
       };
@@ -41,14 +42,19 @@ class _PromoterHomeState extends State<PromoterHome> with NavTarget {
   @override
   void goToTab(int index) => setState(() => _index = index);
 
-  // ⚠️ لينكات `pick:`/`custody:` مابقتش تاب — بيفتحوا شاشة العهدة
-  // فوق الرئيسية بدل ما يضيعوا في `AppNav.pending` بلا قارئ
-  // (نفس نمط المدير ١١/٨)
+  // اللينكات اللي مابقتش تابات — بتفتح شاشتها فوق الرئيسية بدل ما
+  // تضيع في `AppNav.pending` بلا قارئ (نفس نمط المدير ١١/٨)
   @override
   void openLink(String link) {
-    if (AppNav.kindOf(link) == 'pick' || AppNav.kindOf(link) == 'custody') {
-      Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const CustodyScreen()));
+    final Widget? screen = switch (AppNav.kindOf(link)) {
+      'replenishment' => const ReplenishmentsScreen(),
+      'po' => const SupplyOrdersScreen(),
+      'pick' || 'custody' => const CustodyScreen(),
+      _ => null,
+    };
+
+    if (screen != null) {
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
     }
   }
 
@@ -57,25 +63,18 @@ class _PromoterHomeState extends State<PromoterHome> with NavTarget {
     return ListenableBuilder(
       listenable: Session.I,
       builder: (context, _) {
-        // شارات زي تابات المندوب: محطات خطة النهارده الفاضلة،
-        // وأوامر توريد لسه ماتسلمتش
+        // شارة خط السير: محطات خطة النهارده الفاضلة
         final pending = Session.I.journeySummary.pending;
-        final openPos =
-            Session.I.pos.where((p) => p.status != 'delivered').length;
 
         return Scaffold(
           body: IndexedStack(
             index: _index,
             children: const [
               PromoterDashboard(),
-              BranchesScreen(),
-              ReplenishmentsScreen(),
-              // ⚠️ خط السير بدل العهدة (٢٨/٨) — نفس شاشة المندوب،
-              // الداتا من نفس مفاتيح الجلسة اللي _refreshPromoter
-              // بقى بيملاها
+              // المناطق — نفس شاشة المندوب، بالعملاء المتسكنين فعلاً
+              ZonesScreen(),
               JourneyScreen(),
-              SupplyOrdersScreen(),
-              TrackingScreen(),
+              AccountScreen(),
             ],
           ),
           bottomNavigationBar: NavigationBar(
@@ -83,17 +82,13 @@ class _PromoterHomeState extends State<PromoterHome> with NavTarget {
             onDestinationSelected: (i) => setState(() => _index = i),
             destinations: [
               NavigationDestination(
-                  icon: Icon(Icons.home_outlined),
-                  selectedIcon: Icon(Icons.home),
+                  icon: const Icon(Icons.home_outlined),
+                  selectedIcon: const Icon(Icons.home),
                   label: L.t('home')),
               NavigationDestination(
-                  icon: Icon(Icons.storefront_outlined),
-                  selectedIcon: Icon(Icons.storefront),
-                  label: L.t('branches')),
-              NavigationDestination(
-                  icon: Icon(Icons.inventory_outlined),
-                  selectedIcon: Icon(Icons.inventory),
-                  label: L.t('refill_requests')),
+                  icon: const Icon(Icons.map_outlined),
+                  selectedIcon: const Icon(Icons.map),
+                  label: L.t('zones')),
               NavigationDestination(
                   icon: Badge(
                     isLabelVisible: pending > 0,
@@ -103,17 +98,9 @@ class _PromoterHomeState extends State<PromoterHome> with NavTarget {
                   selectedIcon: const Icon(Icons.alt_route),
                   label: L.t('journey')),
               NavigationDestination(
-                  icon: Badge(
-                    isLabelVisible: openPos > 0,
-                    label: Text('$openPos'),
-                    child: const Icon(Icons.local_shipping_outlined),
-                  ),
-                  selectedIcon: const Icon(Icons.local_shipping),
-                  label: L.t('supply_tab')),
-              NavigationDestination(
-                  icon: Icon(Icons.route_outlined),
-                  selectedIcon: Icon(Icons.route),
-                  label: L.t('tracking')),
+                  icon: const Icon(Icons.person_outline),
+                  selectedIcon: const Icon(Icons.person),
+                  label: L.t('account')),
             ],
           ),
         );
@@ -235,6 +222,44 @@ class PromoterDashboard extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
+            // ═══ مداخل الشاشات اللي مابقتش تابات (٢٨/٨) ═══
+            // طلبات الريفيل — شغل المنسق الأساسي، دايماً ظاهر
+            Card(
+              child: ListTile(
+                leading: Badge(
+                  isLabelVisible: s.replenishments.isNotEmpty,
+                  label: Text('${s.replenishments.length}'),
+                  child: const Icon(Icons.inventory_outlined,
+                      color: Color(0xFFEA8C1C)),
+                ),
+                title: Text(L.t('refill_requests'),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 14)),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const ReplenishmentsScreen())),
+              ),
+            ),
+
+            // التوريد — بيظهر بس لو فيه أوامر عليه فعلاً
+            if (s.pos.any((p) => p.status != 'delivered'))
+              Card(
+                child: ListTile(
+                  leading: Badge(
+                    label: Text(
+                        '${s.pos.where((p) => p.status != 'delivered').length}'),
+                    child: const Icon(Icons.local_shipping_outlined,
+                        color: Color(0xFF2563EB)),
+                  ),
+                  title: Text(L.t('supply_tab'),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 14)),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => const SupplyOrdersScreen())),
+                ),
+              ),
+
             // ═══ العهدة — كارت شرطي بدل التاب (٢٨/٨) ═══
             // البروموتر عادةً مايشيلش عهدة، فالتاب اتشال وخط السير
             // خد مكانه. الكارت ده بيظهر **بس** لو فيه فعلاً بضاعة
@@ -309,20 +334,20 @@ class PromoterDashboard extends StatelessWidget {
                       );
               }),
             ] else ...[
-              Text(L.t('zone_branches'),
-                  style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              if (s.branches.isEmpty)
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Center(
-                        child: Text(L.t('no_branches_assigned'),
-                            style: TextStyle(color: Colors.grey.shade600))),
-                  ),
+              // ⚠️ مفيش خطة النهارده — مدخل للمناطق بدل قايمة الزون
+              // القديمة (heuristic كانت بتوري عملاء مش متسكنين عليه)
+              Card(
+                child: ListTile(
+                  leading:
+                      const Icon(Icons.map_outlined, color: Color(0xFF0F766E)),
+                  title: Text(L.t('no_plan_go_zones'),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 13.5)),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => const ZonesScreen())),
                 ),
-              ...s.branches.take(6).map((b) => BranchTile(branch: b)),
+              ),
             ],
           ],
         ),
@@ -432,35 +457,7 @@ class BranchTile extends StatelessWidget {
   final Branch branch;
   const BranchTile({super.key, required this.branch});
 
-  Future<void> _open(BuildContext context) async {
-    final s = Session.I;
-
-    // زيارة مفتوحة على نفس الفرع؟ افتحها
-    if (s.openMerchVisit != null && s.openMerchVisit!.clientId == branch.id) {
-      Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => VisitScreen(visit: s.openMerchVisit!)));
-      return;
-    }
-
-    if (branch.status == BranchVisitStatus.done) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(L.t('branch_visited'))));
-      return;
-    }
-
-    final err = await s.startMerchVisit(branch);
-    if (!context.mounted) return;
-
-    if (err != null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(err)));
-      return;
-    }
-    if (s.openMerchVisit != null) {
-      Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => VisitScreen(visit: s.openMerchVisit!)));
-    }
-  }
+  Future<void> _open(BuildContext context) => openMerchBranch(context, branch);
 
   @override
   Widget build(BuildContext context) {

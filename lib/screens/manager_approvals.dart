@@ -225,8 +225,7 @@ class _RequestCardState extends State<RequestCard> {
               else
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
-                    url,
+                  child: Image.network(url, cacheWidth: 800,
                     fit: BoxFit.contain,
                     errorBuilder: (_, __, ___) => Column(
                       children: [

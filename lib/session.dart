@@ -136,8 +136,10 @@ class Session extends ChangeNotifier {
   /// أرقام المندوب (عهدته، أوامره، إشعاراته) — بصمة المدير مش
   /// بتتغيّر منها، فلو خلّيناه على الدقيقتين كان هيبقى أبطأ من
   /// الأول. لما نعمل بلس للمدير كمان، الاتنين يبقوا دقيقتين.
+  // ⚠️ 90 ثانية للمدير والبروموتر (تدقيق الأداء ١٥/٩): البوت ستراب
+  // حوالي 1 ميجا، وكل 45 ثانية كان بيسحبه 80 مرة في الساعة لكل جهاز.
   Duration get _syncEvery => (isManager || isPromoter)
-      ? const Duration(seconds: 45)
+      ? const Duration(seconds: 90)
       : const Duration(minutes: 2);
 
   /// ⚠️ **الـ10 ثواني دي هي «اللايف» اللي المندوب حاسس بيه.**
@@ -877,7 +879,7 @@ class Session extends ChangeNotifier {
     }
   }
 
-  /// أوامر التجهيز — لو الإندبوينت مش موجود أو وقع، مش المفروض يكسّر الدخول
+  /// أوامر التجهيز — لو الإندبوينت وقع مش المفروض يكسّر الدخول
   Future<void> _loadPicks() async {
     try {
       final d = await Api.I.picks();
@@ -948,9 +950,8 @@ class Session extends ChangeNotifier {
         .toList();
     _readJourney(d['journey']);
 
-    // المخزن — السيرفر لسه مش بيبعتهم في بوت ستراب المدير؛ القراية
-    // الدفاعية دي بتخليهم يشتغلوا فوراً أول ما يتضافوا (نفس أشكال
-    // الميدان)، ولحد ساعتها الديفولت «مش جوه مخزن» وقايمة فاضية.
+    // المخزن — بوت ستراب المدير بيبعت نفس حزمة الميدان
+    // (`warehouseBundle`)؛ القراية دفاعية لو الحزمة غابت لأي سبب.
     final wv = d['warehouse_visit'];
     whStop = wv == null ? null : WarehouseStop.fromJson(wv);
     whToday = WarehouseToday.fromJson(
@@ -1029,6 +1030,10 @@ class Session extends ChangeNotifier {
     // تاب خط السير بيفضل فاضي مهما المالك جدول.
     _readJourney(d['journey']);
 
+    // تاب المناطق (٢٨/٨ — إعادة بناء المنسق): بالتسكين الحقيقي
+    // زي المندوب بالظبط — مش heuristic الزون القديمة
+    zones = ((d['zones'] ?? []) as List).map((e) => Zone.fromJson(e)).toList();
+
     branches =
         ((d['branches'] ?? []) as List).map((e) => Branch.fromJson(e)).toList();
     catalog = ((d['products'] ?? []) as List)
@@ -1068,10 +1073,27 @@ class Session extends ChangeNotifier {
 
   // ---------- أكشنز البروموتر ----------
 
+  /// رد السيرفر فيه `visit` كاملة — بنعتمدها فوراً ونحدّث الباقي (عدادات
+  /// اليوم وحالة الفروع) في الخلفية. لو الرد مافيهوش زيارة بنرجع للتحديث الكامل.
+  void _adoptVisit(Map<String, dynamic> res) {
+    final v = res['visit'];
+    if (v is Map) {
+      openMerchVisit = MerchVisit.fromJson(Map<String, dynamic>.from(v));
+      notifyListeners();
+    }
+    unawaited(refresh());
+  }
+
   Future<String?> startMerchVisit(Branch b) async {
     try {
-      await Api.I.startMerchVisit(b.id);
-      await refresh();
+      // نفس قاعدة التشيك إن: اللوكيشن لو متاح، والزيارة ماتتعطلش لو لأ
+      // ⚠️ (٢١/٩) كانت بتستنى الـGPS لحد 25 ثانية وبعدها bootstrap كامل قبل
+      // ما الشاشة تفتح. الرد نفسه فيه الزيارة — بنفتح عليها فوراً والتحديث
+      // الكامل بيحصل في الخلفية.
+      final pos = await Locator.quick();
+      final res =
+          await Api.I.startMerchVisit(b.id, lat: pos?.$1, lng: pos?.$2);
+      _adoptVisit(res);
       return null;
     } on ApiException catch (e) {
       return e.message;
@@ -1101,9 +1123,9 @@ class Session extends ChangeNotifier {
     if (payload.isEmpty) return L.t('pick_one_item');
 
     try {
-      final pos = await Locator.get();
-      await Api.I.saveRefill(visitId, payload, lat: pos?.$1, lng: pos?.$2);
-      await refresh();
+      final pos = await Locator.quick();
+      _adoptVisit(
+          await Api.I.saveRefill(visitId, payload, lat: pos?.$1, lng: pos?.$2));
       return null;
     } on ApiException catch (e) {
       return e.message;
@@ -1131,9 +1153,22 @@ class Session extends ChangeNotifier {
     }
   }
 
-  Future<String?> closeMerchVisit(int visitId) async {
+  Future<String?> saveShelfCount(int visitId, List<CountLine> lines) async {
     try {
-      await Api.I.closeMerchVisit(visitId);
+      _adoptVisit(await Api.I.saveShelfCount(
+          visitId, lines.map((l) => l.toJson()).toList()));
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    } catch (e) {
+      return L.t('error_with', {'e': '$e'});
+    }
+  }
+
+  Future<String?> closeMerchVisit(int visitId,
+      {bool noPhotos = false, String? reason}) async {
+    try {
+      await Api.I.closeMerchVisit(visitId, noPhotos: noPhotos, reason: reason);
       await refresh();
       return null;
     } on ApiException catch (e) {

@@ -115,9 +115,22 @@ class MerchVisit {
   final bool hasRequest;
   final List<RefillLine> refills;
 
+  /// الزيارة اتقفلت بدون تصوير بعلم المنسق (٢١/٩)
+  final bool noPhotos;
+
+  /// جرد الرف في الزيارة دي، وآخر جرد اتعمل في نفس الفرع قبلها
+  final List<CountLine> counts;
+  final List<CountLine> lastCounts;
+  final DateTime? lastCountAt;
+
+  /// لوكيشن الفرع مؤكَّد من الداشبورد (١٥/٩) — زرار «تأكيد عنوان الفرع»
+  /// بيختفي، والسيرفر بيرفض 409 لو وصله على أي حال
+  final bool locationConfirmed;
+
   MerchVisit.fromJson(Map<String, dynamic> j)
       : id = j['id'],
         clientId = j['client_id'],
+        locationConfirmed = j['location_confirmed'] == true,
         client = j['client'] ?? '',
         address = j['address'] ?? '',
         checkedInAt = parseTime(j['checked_in_at']),
@@ -128,9 +141,60 @@ class MerchVisit {
         movedTotal = j['moved_total'] ?? 0,
         outOfStock = j['out_of_stock'] ?? 0,
         hasRequest = j['has_request'] == true,
+        noPhotos = j['no_photos'] == true,
+        lastCountAt = parseTime(j['last_count_at']),
+        counts = ((j['counts'] ?? []) as List)
+            .map((e) => CountLine.fromJson(Map<String, dynamic>.from(e as Map)))
+            .toList(),
+        lastCounts = ((j['last_counts'] ?? []) as List)
+            .map((e) => CountLine.fromJson(Map<String, dynamic>.from(e as Map)))
+            .toList(),
         refills = ((j['refills'] ?? []) as List)
             .map((e) => RefillLine.fromJson(e))
             .toList();
+}
+
+/// سطر جرد رف: الكمية بوحدتها + تاريخ الإنتاج والانتهاء، بإيد المنسق
+class CountLine {
+  final int productId;
+  final String name;
+  double qty;
+  String unit;
+  DateTime? productionDate;
+  DateTime? expiryDate;
+  String? note;
+
+  CountLine.blank(this.productId, this.name, this.unit) : qty = 0;
+
+  CountLine.fromJson(Map<String, dynamic> j)
+      : productId = j['product_id'],
+        name = j['name'] ?? '',
+        qty = ((j['qty'] ?? 0) as num).toDouble(),
+        unit = j['unit'] ?? 'piece',
+        productionDate = _day(j['production_date']),
+        expiryDate = _day(j['expiry_date']),
+        note = j['note']?.toString();
+
+  static DateTime? _day(dynamic v) =>
+      v == null ? null : DateTime.tryParse(v.toString());
+
+  static String _iso(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  CountLine copy() => CountLine.blank(productId, name, unit)
+    ..qty = qty
+    ..productionDate = productionDate
+    ..expiryDate = expiryDate
+    ..note = note;
+
+  Map<String, dynamic> toJson() => {
+        'product_id': productId,
+        'qty': qty,
+        'unit': unit,
+        'production_date': productionDate == null ? null : _iso(productionDate!),
+        'expiry_date': expiryDate == null ? null : _iso(expiryDate!),
+        'note': note,
+      };
 }
 
 /// صنف في الكتالوج (لاختياره في الريفيل)
@@ -144,12 +208,28 @@ class CatalogProduct {
   final String? image;
   final String unit;
 
+  /// وحدات القياس المعرّفة للصنف ومضاعِف كل واحدة بالقطع (٢١/٩) —
+  /// سيرفر قديم مابيبعتهاش = قطعة بس
+  final Map<String, int> unitFactors;
+
   CatalogProduct.fromJson(Map<String, dynamic> j)
       : id = j['id'],
         code = j['code'] ?? '',
         name = j['name'] ?? '',
         image = j['image'] as String?,
-        unit = j['unit'] ?? '';
+        unit = j['unit'] ?? '',
+        unitFactors = {
+          'piece': 1,
+          for (final e in ((j['unit_factors'] ?? const {}) as Map).entries)
+            e.key.toString(): (e.value as num).toInt(),
+        };
+
+  /// بالترتيب الثابت: قطعة ← علبة ← كرتونة
+  List<String> get countUnits =>
+      ['piece', 'box', 'case'].where(unitFactors.containsKey).toList();
+
+  /// الرف بيتعد بالقطعة — العلبة والكرتونة للمخزن الخلفي
+  String get defaultCountUnit => 'piece';
 }
 
 /// طلب ريفيل

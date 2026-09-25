@@ -2,11 +2,64 @@ import 'package:flutter/material.dart';
 import '../l10n.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../api.dart';
+import '../locator.dart';
 import '../models.dart';
 import '../promoter_models.dart';
 import '../session.dart';
 import 'multi_item_picker.dart';
 import 'shared.dart';
+import 'shelf_count.dart';
+
+/// فتح فرع للمنسق — **المكان الواحد** (٢١/٩). كان منسوخ في تلات شاشات
+/// (خط السير · المناطق · فروعي) وكل نسخة بتتصرف شوية مختلف:
+///   • زيارة مفتوحة على نفس الفرع → كمّلها.
+///   • الفرع اتزار النهارده → **بيسأل** «تبدأ زيارة تانية؟» بدل ما يقفل
+///     الفرع برسالة (بلاغ: «كل ما أدوس على فرع يقولي اتزار النهارده»).
+///   • مؤشر تحميل فوري — الضغطة كانت بتبان ميتة لحد ما السيرفر يرد.
+Future<void> openMerchBranch(BuildContext context, Branch branch) async {
+  // امسكهم قبل أي await — الرسالة بعد الرجوع بتضيع (درس ٩/٨)
+  final messenger = ScaffoldMessenger.of(context);
+  final nav = Navigator.of(context, rootNavigator: true);
+  final s = Session.I;
+
+  if (s.openMerchVisit != null && s.openMerchVisit!.clientId == branch.id) {
+    await Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => VisitScreen(visit: s.openMerchVisit!)));
+    return;
+  }
+
+  if (branch.status == BranchVisitStatus.done) {
+    final again = await confirmAction(
+      context,
+      title: L.t('branch_visited'),
+      message: L.t('pv_revisit_body', {'b': branch.name}),
+      confirmLabel: L.t('pv_revisit_go'),
+      icon: Icons.replay,
+    );
+    if (!again || !context.mounted) return;
+  }
+
+  showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => const PopScope(
+        canPop: false, child: Center(child: CircularProgressIndicator())),
+  );
+
+  final err = await s.startMerchVisit(branch);
+  nav.pop();
+
+  if (err != null) {
+    messenger.showSnackBar(SnackBar(content: Text(err)));
+    return;
+  }
+
+  if (s.openMerchVisit != null && context.mounted) {
+    await Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => VisitScreen(visit: s.openMerchVisit!)));
+  }
+}
 
 /// شاشة زيارة الفرع: صورة قبل ← ريفيل ← طلب ناقص ← صورة بعد ← خروج
 class VisitScreen extends StatefulWidget {
@@ -19,8 +72,42 @@ class VisitScreen extends StatefulWidget {
 
 class _VisitScreenState extends State<VisitScreen> {
   bool _busy = false;
+  bool _sendingLoc = false;
 
   MerchVisit get visit => Session.I.openMerchVisit ?? widget.visit;
+
+  /// تأكيد العنوان (٢٨/٨): سحب النقطة → طلب تعديل عنوان للأدمن —
+  /// نفس مسار المندوب بالحرف (المندوب بيبعت والأدمن بيأكد)
+  Future<void> _confirmAddress() async {
+    // امسك قبل الـawait — الرسالة بعد الرجوع بتضيع (درس ٩/٨)
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _sendingLoc = true);
+
+    final pos = await Locator.get();
+
+    if (pos == null) {
+      if (!mounted) return;
+      setState(() => _sendingLoc = false);
+      messenger.showSnackBar(SnackBar(content: Text(L.t('nc_gps_failed'))));
+
+      return;
+    }
+
+    try {
+      await Api.I.saveClientLocation(visit.clientId, lat: pos.$1, lng: pos.$2);
+      if (!mounted) return;
+      setState(() => _sendingLoc = false);
+      messenger.showSnackBar(SnackBar(content: Text(L.t('pv_addr_sent'))));
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _sendingLoc = false);
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _sendingLoc = false);
+      messenger.showSnackBar(SnackBar(content: Text(L.t('server_down'))));
+    }
+  }
 
   Future<void> _run(Future<String?> Function() action, [String? okMsg]) async {
     setState(() => _busy = true);
@@ -36,10 +123,36 @@ class _VisitScreenState extends State<VisitScreen> {
     }
   }
 
+  /// الكاميرا ولا الجاليري (طلب المالك ٢١/٩) — فرع مانع التصوير جوّاه،
+  /// أو صورة اتاخدت بكاميرا التليفون قبل فتح الأبلكيشن
+  Future<ImageSource?> _askSource() => showModalBottomSheet<ImageSource>(
+        context: context,
+        builder: (sheet) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_camera_outlined),
+                title: Text(L.t('pv_src_camera')),
+                onTap: () => Navigator.of(sheet).pop(ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: Text(L.t('pv_src_gallery')),
+                onTap: () => Navigator.of(sheet).pop(ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      );
+
   Future<void> _shootShelf(String stage) async {
+    final source = await _askSource();
+    if (source == null || !mounted) return;
+
     try {
-      final x = await ImagePicker().pickImage(
-          source: ImageSource.camera, imageQuality: 75, maxWidth: 1800);
+      final x = await ImagePicker()
+          .pickImage(source: source, imageQuality: 75, maxWidth: 1800);
       if (x == null) return;
       await _run(
         () => Session.I.uploadShelfPhoto(visit.id, stage, x.path),
@@ -53,8 +166,61 @@ class _VisitScreenState extends State<VisitScreen> {
     }
   }
 
+  /// إنهاء بدون تصوير (طلب المالك ٢١/٩): سبب مكتوب إجباري، والسيرفر
+  /// بيعلّم الزيارة وبيبعت تنبيه لمدير المنسق
+  Future<String?> _askNoPhotoReason() {
+    final ctrl = TextEditingController();
+
+    return showDialog<String>(
+      context: context,
+      builder: (dlg) => AlertDialog(
+        title: Text(L.t('pv_no_photos_title')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(L.t('pv_no_photos_body'), style: const TextStyle(fontSize: 13)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              autofocus: true,
+              maxLength: 190,
+              maxLines: 2,
+              decoration: InputDecoration(labelText: L.t('pv_no_photos_reason')),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(dlg).pop(),
+              child: Text(L.t('cancel'))),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFB00020)),
+            onPressed: () {
+              final r = ctrl.text.trim();
+              if (r.length < 3) return;
+              Navigator.of(dlg).pop(r);
+            },
+            child: Text(L.t('pv_no_photos_confirm')),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _close() async {
-    await _run(() => Session.I.closeMerchVisit(visit.id));
+    final v = visit;
+
+    if (!v.hasPhotoBefore || !v.hasPhotoAfter) {
+      final reason = await _askNoPhotoReason();
+      if (reason == null || !mounted) return;
+      await _run(() =>
+          Session.I.closeMerchVisit(v.id, noPhotos: true, reason: reason));
+    } else {
+      await _run(() => Session.I.closeMerchVisit(v.id));
+    }
+
     if (mounted && Session.I.openMerchVisit == null) {
       Navigator.of(context).pop();
     }
@@ -189,6 +355,30 @@ class _VisitScreenState extends State<VisitScreen> {
                 ),
               ),
 
+              // ---- جرد الرف بإيد المنسق (٢١/٩): كميات بوحداتها +
+              // تواريخ إنتاج وانتهاء. اختياري، ومحفوظ على الفرع ----
+              Card(
+                child: ListTile(
+                  leading: Icon(Icons.fact_check_outlined,
+                      color: v.counts.isEmpty ? primary : const Color(0xFF16A34A)),
+                  title: Text(L.t('sc_title'),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 13.5)),
+                  subtitle: Text(
+                      v.counts.isNotEmpty
+                          ? L.t('sc_done_n', {'n': '${v.counts.length}'})
+                          : v.lastCounts.isNotEmpty
+                              ? L.t('sc_last_hint', {'n': '${v.lastCounts.length}'})
+                              : L.t('sc_card_hint'),
+                      style: const TextStyle(fontSize: 11)),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                  onTap: closed
+                      ? null
+                      : () => Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => ShelfCountScreen(visit: v))),
+                ),
+              ),
+
               // ---- 3. طلب ريفيل للناقص ----
               if (v.outOfStock > 0 || v.hasRequest)
                 _StepCard(
@@ -224,6 +414,31 @@ class _VisitScreenState extends State<VisitScreen> {
                               ),
                           ],
                         ),
+                ),
+
+              // ---- تأكيد العنوان (٢٨/٨ — طلب المالك: تالت زرار
+              // الزيارة). بيسحب النقطة ويبعت **طلب** تعديل عنوان —
+              // نفس فلو المندوب: المندوب بيبعت نقطة والأدمن بيأكد ----
+              // ⚠️ وبيختفي على الفرع المؤكَّد من الداشبورد (١٥/٩) —
+              // نفس قاعدة زرار المندوب، والسيرفر بيرفض 409 كمان
+              if (!closed && !v.locationConfirmed)
+                Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.share_location,
+                        color: Color(0xFF0F766E)),
+                    title: Text(L.t('pv_confirm_addr'),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 13.5)),
+                    subtitle: Text(L.t('pv_confirm_addr_hint'),
+                        style: const TextStyle(fontSize: 11)),
+                    trailing: _sendingLoc
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.arrow_forward_ios, size: 14),
+                    onTap: _sendingLoc ? null : _confirmAddress,
+                  ),
                 ),
 
               // ---- 4. صورة الرف بعد ----
@@ -365,7 +580,7 @@ class _PhotoBox extends StatelessWidget {
             ? Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.network(url!,
+                  Image.network(url!, cacheWidth: 800,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => const Center(
                           child: Icon(Icons.check_circle,

@@ -578,6 +578,9 @@ class JourneyStop {
   final DateTime? lastVisitAt;
   final String category;
   final String categoryLabel;
+
+  /// فرع سلسلة ولا عميل فردي — شاشة خط السير بتفصلهم سكشنين (٢٨/٨)
+  final bool isChain;
   final bool taxable;
   final double taxRate;
   final int sort;
@@ -621,6 +624,7 @@ class JourneyStop {
         lastVisitAt = parseTime(j['last_visit_at']),
         category = j['category'] ?? 'ok',
         categoryLabel = j['category_label'] ?? '',
+        isChain = j['is_chain'] == true,
         taxable = j['taxable'] == true,
         taxRate = ((j['tax_rate'] ?? 0) as num).toDouble(),
         sort = j['sort'] ?? 0,

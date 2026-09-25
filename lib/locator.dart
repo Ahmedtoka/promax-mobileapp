@@ -58,6 +58,22 @@ class Locator {
     }
   }
 
+  /// نقطة **سريعة** لبدء الزيارة (٢١/٩ — بلاغ «العميل بيفتح في 12 ثانية»):
+  /// fix عمره أقل من دقيقتين بيرجع فوراً من غير ما نصحّي الـGPS، وغير كده
+  /// بنستنى `wait` بالكتير ونرجع بآخر نقطة معروفة. السيرفر عنده فولباك
+  /// لوكيشن الفرع للحدث، فالزيارة مابتتعطلش على إشارة ضعيفة.
+  static Future<(double, double)?> quick(
+      {Duration wait = const Duration(seconds: 4)}) async {
+    final at = _lastAt;
+    if (_last != null &&
+        at != null &&
+        DateTime.now().difference(at) < const Duration(minutes: 2)) {
+      return _last;
+    }
+
+    return get().timeout(wait, onTimeout: _stale);
+  }
+
   /// آخر نقطة لو عمرها أقل من ١٠ دقايق — وإلا null زي الأول
   static (double, double)? _stale() {
     final at = _lastAt;

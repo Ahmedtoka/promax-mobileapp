@@ -501,8 +501,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   void initState() {
     super.initState();
     _load();
-    // بولينج زي شات الويب — ولو الحالة اتغيرت بنعيد تحميل الكل
-    _poll = Timer.periodic(const Duration(seconds: 6), (_) => _tick());
+    // بولينج زي شات الويب — ولو الحالة اتغيرت بنعيد تحميل الكل.
+    // ⚠️ 30 ثانية مش 6 (تدقيق الأداء ١٥/٩): 6 ثواني = 10 ريكوست في
+    // الدقيقة لكل مدير فاتح الشاشة، والمهام مش شات لحظي.
+    _poll = Timer.periodic(const Duration(seconds: 30), (_) => _tick());
   }
 
   @override
@@ -846,7 +848,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             m['is_img'] == true
                 ? ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.network('${m['file_url']}',
+                    child: Image.network('${m['file_url']}', cacheWidth: 800,
                         height: 140,
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) =>

@@ -99,6 +99,8 @@ class _ManagerEquationBoardState extends State<ManagerEquationBoard> {
     final debt = Map<String, dynamic>.from((d?['debt'] ?? const {}) as Map);
     final street = Map<String, dynamic>.from((d?['street'] ?? const {}) as Map);
     final managers = (d?['managers'] as List?) ?? const [];
+    final series = (d?['series'] as List?) ?? const [];
+    final topReps = (d?['top_reps'] as List?) ?? const [];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -278,8 +280,221 @@ class _ManagerEquationBoardState extends State<ManagerEquationBoard> {
               ),
             ],
           ),
+
+          // ═══ السلسلة الزمنية مبيعات/تحصيل + أفضل المناديب (٢٥/٩) ═══
+          // السيرفر كان بيبعتهم من ٢٨/٨ والشاشة ماكانتش بترسمهم
+          if (series.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _SeriesBars(series: series),
+          ],
+          if (topReps.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _TopReps(reps: topReps),
+          ],
         ],
       ],
+    );
+  }
+}
+
+/// أعمدة مبيعات/تحصيل لكل يوم (أو شهر) — بلا مكتبات، عمودين لكل نقطة
+class _SeriesBars extends StatelessWidget {
+  const _SeriesBars({required this.series});
+
+  final List series;
+
+  @override
+  Widget build(BuildContext context) {
+    double mx = 1;
+    for (final e in series) {
+      final m = Map<String, dynamic>.from(e as Map);
+      final a = (m['sales'] as num?)?.toDouble() ?? 0;
+      final b = (m['coll'] as num?)?.toDouble() ?? 0;
+      if (a > mx) mx = a;
+      if (b > mx) mx = b;
+    }
+    const h = 72.0;
+    final n = series.length;
+    final labelEvery = n <= 8 ? 1 : (n / 6).ceil();
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(L.t('eq_series_title'),
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w800)),
+              ),
+              _legendDot(const Color(0xFF12399B), L.t('eq_leg_sales')),
+              const SizedBox(width: 8),
+              _legendDot(const Color(0xFF16A34A), L.t('eq_leg_coll')),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: h + 18,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                for (var i = 0; i < n; i++)
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 1.5),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Expanded(
+                                child: Container(
+                                  height: h *
+                                      (((series[i]['sales'] as num?)
+                                                  ?.toDouble() ??
+                                              0) /
+                                          mx),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF12399B),
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 1),
+                              Expanded(
+                                child: Container(
+                                  height: h *
+                                      (((series[i]['coll'] as num?)
+                                                  ?.toDouble() ??
+                                              0) /
+                                          mx),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF16A34A),
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(
+                            height: 16,
+                            child: i % labelEvery == 0
+                                ? Text(_short('${series[i]['k'] ?? ''}'),
+                                    maxLines: 1,
+                                    style: TextStyle(
+                                        fontSize: 9,
+                                        color: Colors.grey.shade600))
+                                : null,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 2026-09-17 → 17 · 2026-09 → 09
+  static String _short(String k) =>
+      k.length >= 10 ? k.substring(8, 10) : (k.length >= 7 ? k.substring(5, 7) : k);
+
+  static Widget _legendDot(Color c, String t) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+              width: 8,
+              height: 8,
+              decoration:
+                  BoxDecoration(color: c, borderRadius: BorderRadius.circular(2))),
+          const SizedBox(width: 4),
+          Text(t, style: TextStyle(fontSize: 10.5, color: Colors.grey.shade700)),
+        ],
+      );
+}
+
+/// أفضل المناديب بالمبيعات في الفترة — الاسم وعدد الفواتير والقيمة
+class _TopReps extends StatelessWidget {
+  const _TopReps({required this.reps});
+
+  final List reps;
+
+  @override
+  Widget build(BuildContext context) {
+    double mx = 1;
+    for (final e in reps) {
+      final v = ((e as Map)['v'] as num?)?.toDouble() ?? 0;
+      if (v > mx) mx = v;
+    }
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(L.t('eq_top_reps'),
+              style:
+                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 6),
+          for (var i = 0; i < reps.length; i++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 18,
+                    child: Text('${i + 1}',
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.grey.shade500)),
+                  ),
+                  Expanded(
+                    flex: 3,
+                    child: Text('${(reps[i] as Map)['name'] ?? ''}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 12.5, fontWeight: FontWeight.w700)),
+                  ),
+                  Expanded(
+                    flex: 4,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: (((reps[i] as Map)['v'] as num?)?.toDouble() ??
+                                0) /
+                            mx,
+                        minHeight: 8,
+                        backgroundColor: Colors.grey.shade100,
+                        color: const Color(0xFF7C3AED),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                      '${money(((reps[i] as Map)['v'] as num?)?.toDouble() ?? 0)} • ${((reps[i] as Map)['n'] as num?)?.toInt() ?? 0}',
+                      style: const TextStyle(
+                          fontSize: 11.5, fontWeight: FontWeight.w800)),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

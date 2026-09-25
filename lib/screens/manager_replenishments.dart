@@ -320,11 +320,10 @@ class _ReplCard extends StatelessWidget {
                         context: context,
                         builder: (_) => Dialog(
                           child: InteractiveViewer(
-                              child: Image.network(url)),
+                              child: Image.network(url, cacheWidth: 800)),
                         ),
                       ),
-                      child: Image.network(
-                        url,
+                      child: Image.network(url, cacheWidth: 800,
                         height: 90,
                         width: double.infinity,
                         fit: BoxFit.cover,

@@ -252,8 +252,7 @@ class _ItemCartState extends State<ItemCart> {
           height: size,
           child: i.image == null
               ? _thumbFallback(size)
-              : Image.network(
-                  i.image!,
+              : Image.network(i.image!, cacheWidth: 800,
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => _thumbFallback(size),
                 ),

@@ -7,7 +7,6 @@ import '../brand.dart';
 import '../l10n.dart';
 import '../locator.dart';
 import '../models.dart';
-import 'shared.dart';
 
 /// ═══════════════════════════════════════════════════════════════
 /// شاشة التشجيع «حوافزي» — الأبديت الكبير (2026-08-06)

@@ -340,6 +340,9 @@ class _GiftsScreenState extends State<GiftsScreen> {
     final left = (item['left'] ?? 0) as int;
     final qtyCtrl = TextEditingController(text: '1');
     final noteCtrl = TextEditingController();
+    // السبب — الـAPI بيخزّنه وبيرجّعه في `handouts` وشاشة الهدايا
+    // بتعرضه، لكن الفورم عمره ما بعته فالعمود كان فاضي دايماً (٩/٩)
+    final reasonCtrl = TextEditingController();
 
     // من صفحة العميل؟ المستلم محدد سلفاً
     var recipient = widget.presetClientId != null
@@ -389,6 +392,16 @@ class _GiftsScreenState extends State<GiftsScreen> {
                 ),
                 const SizedBox(height: 12),
                 TextField(
+                  controller: reasonCtrl,
+                  maxLength: 40,
+                  decoration: InputDecoration(
+                    labelText: L.t('gift_reason'),
+                    border: const OutlineInputBorder(),
+                    counterText: '',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
                   controller: noteCtrl,
                   decoration: InputDecoration(
                     labelText: L.t('gift_note'),
@@ -423,6 +436,7 @@ class _GiftsScreenState extends State<GiftsScreen> {
         'client_id': recipient.clientId,
         'client_request_id': recipient.requestId,
         'visit_id': widget.visitId,
+        'reason': reasonCtrl.text.trim().isEmpty ? null : reasonCtrl.text.trim(),
         'note': noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
       });
 

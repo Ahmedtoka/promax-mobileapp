@@ -636,8 +636,7 @@ Widget _thumb(HistoryEntry e, HistoryKind kind) {
 
   return ClipRRect(
     borderRadius: BorderRadius.circular(10),
-    child: Image.network(
-      url,
+    child: Image.network(url, cacheWidth: 800,
       width: 44,
       height: 44,
       fit: BoxFit.cover,
@@ -740,8 +739,7 @@ class _DetailSheet extends StatelessWidget {
                     const SizedBox(height: 14),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(14),
-                      child: Image.network(
-                        url,
+                      child: Image.network(url, cacheWidth: 800,
                         width: double.infinity,
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Container(
@@ -793,7 +791,7 @@ class _LineRow extends StatelessWidget {
                       child: Icon(Icons.inventory_2_outlined,
                           size: 18, color: Brand.muted),
                     )
-                  : Image.network(line.image!,
+                  : Image.network(line.image!, cacheWidth: 800,
                       width: 40,
                       height: 40,
                       fit: BoxFit.cover,

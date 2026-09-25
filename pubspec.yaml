@@ -1,7 +1,7 @@
 name: sales_rep_app
 description: PROMAX مناديب — أبلكيشن الكاش فان والكورير (متصل بـ PROMAX ERP)
 publish_to: 'none'
-version: 1.1.5+7
+version: 2.5.1+11
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -27,7 +27,7 @@ flutter:
   assets:
     - assets/brand/logo/
 
-  # خطوط الواجهة — Cairo للعربي و Poppins للإنجليزي، وZagma للعناوين
+  # خطوط الواجهة — Cairo للعربي و Poppins للإنجليزي
   #
   # ⚠️ كل وزن لازم يكون له ملف. فلاتر **مابيعملش bold صناعي** للخط
   # المخصص: لو الوزن مش مسجّل هنا، `FontWeight.w700` بينزل على أقرب
@@ -57,9 +57,3 @@ flutter:
           weight: 500
         - asset: assets/brand/fonts/Poppins-Bold.ttf
           weight: 700
-    - family: Zagma
-      fonts:
-        - asset: assets/brand/fonts/Zagma-Regular.otf
-          weight: 400
-        - asset: assets/brand/fonts/Zagma-Black.otf
-          weight: 900

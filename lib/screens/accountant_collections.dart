@@ -186,8 +186,7 @@ class _AccountantCollectionsBoardState
               // صورة الإثبات — المطابقة من الموبايل
               ClipRRect(
                 borderRadius: BorderRadius.circular(10),
-                child: Image.network(
-                  r.proofUrl!,
+                child: Image.network(r.proofUrl!, cacheWidth: 800,
                   height: 130,
                   width: double.infinity,
                   fit: BoxFit.cover,

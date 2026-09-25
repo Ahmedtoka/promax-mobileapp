@@ -199,7 +199,7 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
                       if (it.$3 != null) ...[
                         ClipRRect(
                           borderRadius: BorderRadius.circular(7),
-                          child: Image.network(it.$3!,
+                          child: Image.network(it.$3!, cacheWidth: 800,
                               width: 34,
                               height: 34,
                               fit: BoxFit.contain,
